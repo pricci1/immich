@@ -30,25 +30,9 @@ export class OwnershipService extends BaseService {
       return;
     }
 
-    const assetsToTransfer = assets.filter((asset) => asset.ownerId !== album.ownerId);
-    if (assetsToTransfer.length === 0) {
-      return;
-    }
+    const assetsToTransfer = assets.filter((asset) => asset.ownerId !== album.ownerId) || [];
 
-    for (const asset of assetsToTransfer) {
-      await this.assetRepository.update({
-        id: asset.id,
-        ownerId: album.ownerId,
-      });
-
-      this.logger.log(`Transferred ownership of asset ${asset.id} from ${asset.ownerId} to ${album.ownerId}`);
-
-      const fileSize = asset.exifInfo?.fileSizeInByte || 0;
-      if (fileSize > 0 && !asset.libraryId) {
-        await this.userRepository.updateUsage(asset.ownerId, -fileSize);
-        await this.userRepository.updateUsage(album.ownerId, fileSize);
-      }
-    }
+    await this.transferAssetsOwnership(assetsToTransfer, album.ownerId);
   }
 
   @OnEvent({ name: 'album.invite' })
@@ -78,5 +62,21 @@ export class OwnershipService extends BaseService {
     await this.albumUserRepository.delete({ albumsId: id, usersId: admin.id });
     await this.albumUserRepository.create({ albumsId: id, usersId: album.ownerId, role: AlbumUserRole.EDITOR });
     // TODO transfer assets ownership
+
+  private async transferAssetsOwnership(assets: any[], newOwnerId: string) {
+    for (const asset of assets) {
+      await this.assetRepository.update({
+        id: asset.id,
+        ownerId: newOwnerId,
+      });
+
+      this.logger.log(`Transferred ownership of asset ${asset.id} from ${asset.ownerId} to ${newOwnerId}`);
+
+      const fileSize = asset.exifInfo?.fileSizeInByte || 0;
+      if (fileSize > 0 && !asset.libraryId) {
+        await this.userRepository.updateUsage(asset.ownerId, -fileSize);
+        await this.userRepository.updateUsage(newOwnerId, fileSize);
+      }
+    }
   }
 }
