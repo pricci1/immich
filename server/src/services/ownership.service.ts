@@ -61,7 +61,10 @@ export class OwnershipService extends BaseService {
     // remove admin from album's users, since owners are already included
     await this.albumUserRepository.delete({ albumsId: id, usersId: admin.id });
     await this.albumUserRepository.create({ albumsId: id, usersId: album.ownerId, role: AlbumUserRole.EDITOR });
-    // TODO transfer assets ownership
+
+    const assetsToTransfer = album.assets?.filter((asset) => asset.ownerId !== admin.id) || [];
+    await this.transferAssetsOwnership(assetsToTransfer, admin.id);
+  }
 
   private async transferAssetsOwnership(assets: any[], newOwnerId: string) {
     for (const asset of assets) {
